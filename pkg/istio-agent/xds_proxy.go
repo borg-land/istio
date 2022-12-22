@@ -46,6 +46,7 @@ import (
 	"istio.io/istio/pkg/h2c"
 	"istio.io/istio/pkg/istio-agent/health"
 	"istio.io/istio/pkg/istio-agent/metrics"
+	"istio.io/istio/pkg/istio-agent/spire"
 	istiokeepalive "istio.io/istio/pkg/keepalive"
 	"istio.io/istio/pkg/log"
 	"istio.io/istio/pkg/model"
@@ -120,6 +121,10 @@ type XdsProxy struct {
 	ecdsLastNonce         atomic.String
 	downstreamGrpcOptions []grpc.ServerOption
 	istiodSAN             string
+
+	// spireClient is the SPIRE Workload API client used to fetch the x509
+	// certificate for the workload associated with this proxy/pilot-agent instance
+	spireClient *spire.WorkloadClient
 }
 
 var proxyLog = log.RegisterScope("xdsproxy", "XDS Proxy in Istio Agent")
@@ -129,7 +134,7 @@ const (
 	localHostIPv6 = "::1"
 )
 
-func initXdsProxy(ia *Agent) (*XdsProxy, error) {
+func initXdsProxy(ctx context.Context, ia *Agent) (*XdsProxy, error) {
 	var err error
 	localHostAddr := localHostIPv4
 	if ia.cfg.IsIPv6 {
@@ -193,6 +198,12 @@ func initXdsProxy(ia *Agent) (*XdsProxy, error) {
 		return nil, err
 	}
 
+	// If WorkloadIdentitySocketPath is set, configure an x509 watcher to obtain
+	// x509 SVID from SPIRE.
+	if ia.cfg.WorkloadIdentitySocketPath != "" {
+		proxy.spireClient = spire.NewWorkloadClient(ia.cfg.WorkloadIdentitySocketPath)
+		go proxy.spireClient.StartX509Watcher(ctx)
+	}
 	if err = proxy.initIstiodDialOptions(ia); err != nil {
 		return nil, err
 	}
@@ -348,6 +359,28 @@ func (p *XdsProxy) handleStream(downstream adsStream) error {
 	}
 	defer upstreamConn.Close()
 
+	// If SPIRE is issuing workload identity, ensure Istiod connection
+	// is terminated when the workload identity changes.
+	if p.spireClient != nil {
+		identityChangeCtx, identityChangeCancel := context.WithCancel(context.Background())
+		defer identityChangeCancel()
+		identityChange, id := p.spireClient.SubscribeToIdentityChange()
+		defer p.spireClient.UnsubscribeFromIdentityChange(id)
+
+		go func(conn *grpc.ClientConn) {
+			for {
+				select {
+				case <-identityChange:
+					proxyLog.Info("workload identity changed, disconnecting from Istiod")
+					conn.Close()
+
+				case <-identityChangeCtx.Done():
+					return
+				}
+			}
+		}(upstreamConn)
+	}
+
 	xds := discovery.NewAggregatedDiscoveryServiceClient(upstreamConn)
 	ctx = metadata.AppendToOutgoingContext(context.Background(), "ClusterID", p.clusterID)
 	for k, v := range p.xdsHeaders {
@@ -428,7 +461,7 @@ func (p *XdsProxy) handleUpstreamRequest(con *ProxyConnection) {
 
 			// forward to istiod
 			con.sendRequest(req)
-			if !initialRequestsSent.Load() && req.TypeUrl == model.ListenerType {
+			if !initialRequestsSent.Load() && (req.TypeUrl == model.ListenerType || p.ia.cfg.ProxyKind == ProxyKindZtunnel) {
 				// fire off an initial NDS request
 				if _, f := p.handlers[model.NameTableType]; f {
 					con.sendRequest(&discovery.DiscoveryRequest{
@@ -633,7 +666,17 @@ func (p *XdsProxy) initDownstreamServer() error {
 }
 
 func (p *XdsProxy) initIstiodDialOptions(agent *Agent) error {
-	opts, err := p.buildUpstreamClientDialOpts(agent)
+	var opts []grpc.DialOption
+	var err error
+
+	// If WorkloadIdentitySocketPath is set, we use a different
+	// `GetClientCertificate()` callback in the TLS options. This is set up by
+	// `buildSPIREIstiodClientDialOpts()`
+	if agent.cfg.WorkloadIdentitySocketPath != "" {
+		opts, err = p.buildSPIREIstiodClientDialOpts(agent)
+	} else {
+		opts, err = p.buildUpstreamClientDialOpts(agent)
+	}
 	if err != nil {
 		return err
 	}

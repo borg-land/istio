@@ -56,22 +56,23 @@ import (
 
 var (
 	// TODO refactor away from package vars and add more UTs
-	tokenDuration  int64
-	name           string
-	serviceAccount string
-	filename       string
-	outputDir      string
-	clusterID      string
-	ingressIP      string
-	internalIP     string
-	externalIP     string
-	ingressSvc     string
-	autoRegister   bool
-	dnsCapture     bool
-	ports          []string
-	resourceLabels []string
-	annotations    []string
-	namespace      string
+	tokenDuration      int64
+	name               string
+	serviceAccount     string
+	filename           string
+	outputDir          string
+	clusterID          string
+	ingressIP          string
+	internalIP         string
+	externalIP         string
+	ingressSvc         string
+	autoRegister       bool
+	dnsCapture         bool
+	ports              []string
+	resourceLabels     []string
+	annotations        []string
+	namespace          string
+	useSvcAccountToken bool
 )
 
 const (
@@ -270,6 +271,8 @@ Configure requires either the WorkloadGroup artifact path or its location on the
 	configureCmd.PersistentFlags().BoolVar(&dnsCapture, "capture-dns", true, "Enables the capture of outgoing DNS packets on port 53, redirecting to istio-agent")
 	configureCmd.PersistentFlags().StringVar(&internalIP, "internalIP", "", "Internal IP address of the workload")
 	configureCmd.PersistentFlags().StringVar(&externalIP, "externalIP", "", "External IP address of the workload")
+	// TODO: Consider defaulting service account token usage to 'false'. It is set to 'true' for backward compatibility.
+	configureCmd.PersistentFlags().BoolVar(&useSvcAccountToken, "useServiceAccountToken", true, "Use k8s service account token for workload authentication")
 	opts.AttachControlPlaneFlags(configureCmd)
 	return configureCmd
 }
@@ -394,6 +397,10 @@ func createCertsTokens(kubeClient kube.CLIClient, wg *clientv1alpha3.WorkloadGro
 	}
 	if err = os.WriteFile(filepath.Join(dir, "root-cert.pem"), []byte(rootCert.Data[constants.CACertNamespaceConfigMapDataName]), filePerms); err != nil {
 		return err
+	}
+
+	if !useSvcAccountToken {
+		return nil
 	}
 
 	serviceAccount := wg.Spec.Template.ServiceAccount

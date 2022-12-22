@@ -256,6 +256,9 @@ type Options struct {
 	KeyFilePath string
 	// The path for an existing root certificate bundle
 	RootCertFilePath string
+
+	// JWT (istio-token) file path
+	JWTFilePath string
 }
 
 // Client interface defines the clients need to implement to talk to CA for CSR.

@@ -55,5 +55,8 @@ func GetResourceType(shortType string) string {
 
 // IsEnvoyType checks whether the typeURL is a valid Envoy type.
 func IsEnvoyType(typeURL string) bool {
-	return model.IsEnvoyType(typeURL)
+	// WorkloadRBACType is required when using ZTunnel as the proxy.
+	// Note that the function name still refers to Envoy when when using
+	// ZTunnel to keep diff with upstream minimal.
+	return model.IsEnvoyType(typeURL) || typeURL == WorkloadType || typeURL == WorkloadAuthorizationType
 }

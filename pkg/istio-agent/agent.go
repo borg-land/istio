@@ -72,6 +72,11 @@ const (
 	MetadataClientRootCert = "ISTIO_META_TLS_CLIENT_ROOT_CERT"
 )
 
+const (
+	// ProxyKindZtunnel refers to the ztunnel proxy
+	ProxyKindZtunnel = "ztunnel"
+)
+
 var _ ready.Prober = &Agent{}
 
 type LifecycleEvent string
@@ -238,6 +243,13 @@ type AgentOptions struct {
 	// by Istio's default SDS server, the socket file must be present.
 	// Note that the path is not configurable by design - only the socket file name.
 	WorkloadIdentitySocketFile string
+
+	// Proxy kind, e.g., ztunnel
+	ProxyKind string
+
+	// WorkloadIdentitySocketPath is the unix domain socket path to use
+	// to obtain x509 SVID when using SPIRE as the CA
+	WorkloadIdentitySocketPath string
 }
 
 // NewAgent hosts the functionality for local SDS and XDS. This consists of the local SDS server and
@@ -385,6 +397,8 @@ func (a *Agent) Run(ctx context.Context) (func(), error) {
 	}
 	if socketExists {
 		log.Infof("Existing workload SDS socket found at %s. Default Istio SDS Server won't be started", configuredAgentSocketPath)
+	} else if a.cfg.WorkloadIdentitySocketPath != "" {
+		log.Info("Using SPIRE Workload API, Istio SDS server won't be started")
 	} else {
 		// If we are configured to use something other than the default Istio SDS server and we can't find a socket at that path, error out.
 		if !isIstioSDS {
@@ -398,7 +412,7 @@ func (a *Agent) Run(ctx context.Context) (func(), error) {
 			return nil, fmt.Errorf("failed to start default Istio SDS server: %v", err)
 		}
 	}
-	a.xdsProxy, err = initXdsProxy(a)
+	a.xdsProxy, err = initXdsProxy(ctx, a)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start xds proxy: %v", err)
 	}
