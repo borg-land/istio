@@ -34,5 +34,8 @@ ENV ISTIO_META_ISTIO_PROXY_SHA $proxy_version
 ARG TARGETARCH
 COPY ${TARGETARCH:-amd64}/pilot-agent /usr/local/bin/pilot-agent
 
+# Add modsecurity core rule set files
+COPY solo-crs /usr/local/bin/modsecurity
+
 # The pilot-agent will bootstrap Envoy.
 ENTRYPOINT ["/usr/local/bin/pilot-agent"]
