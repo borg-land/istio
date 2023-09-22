@@ -75,8 +75,23 @@ if [ "${DEBUG}" == "1" ]; then
     OPTIMIZATION_FLAGS=()
 fi
 
-time GOOS=${BUILD_GOOS} GOARCH=${BUILD_GOARCH} ${GOBINARY} build \
+# For FIPS builds, which at the moment are only supported on linux/amd64, we need to build with
+# -linkshared and set GOEXPERIMENT=boringcrypto.
+if [[ "$BUILD_GOOS" == "linux" ]] && { [[ "$GOARCH" == "amd64" ]] || [[ "$GOARCH" == "arm64" ]]; }; then
+    export CGO_ENABLED=1
+    export GOEXPERIMENT=boringcrypto
+
+    LDFLAGS="-linkmode external --extldflags -static ${LDFLAGS} ${LD_EXTRAFLAGS}"
+    LD_EXTRAFLAGS=""
+
+    if [[ "$GOARCH" == "arm64" ]]; then
+        export CC=aarch64-linux-gnu-gcc
+    fi
+fi
+
+time CC=${CC} GOOS=${BUILD_GOOS} GOARCH=${BUILD_GOARCH} ${GOBINARY} build \
         ${V} "${GOBUILDFLAGS_ARRAY[@]}" ${GCFLAGS:+-gcflags "${GCFLAGS}"} \
+        --tags "netgo" \
         -o "${OUT}" \
         "${OPTIMIZATION_FLAGS[@]}" \
         -pkgdir="${GOPKG}/${BUILD_GOOS}_${BUILD_GOARCH}" \
