@@ -93,3 +93,31 @@ defaults:
   # TODO Ambient inpod - for OpenShift, set to the following to get writable sockets in hostmounts to work, eventually consider CSI driver instead
   #seLinuxOptions:
   #  type: spc_t
+
+# Configuration for Solo's L7 telemetry support in Ztunnel
+l7Telemetry:
+  # Globally enable or disable L7. Disabling this also disables any telemetry and other sniffing logic in the streams wrapper
+  enabled: true
+  # Enable or disable L7 telemetry for node local traffic. Only applicable if l7Telemetry.enabled is true.
+  sameNode: true
+
+  metrics:
+    # Enable or disable L7 metrics
+    enabled: true
+
+  accessLog:
+    # Enable or disable access log output
+    enabled: true
+    # If specified, adds a file appender in addition to the console logger
+    file: ""
+    # If specified, keeps the size of the buffer, used by the file flusher, bounded to the size in bytes.
+    fileBoundSize: 64000
+    # A list of request HTTP headers to be included in the access log output. Setting this will override the default
+    # headers of `host`, `x-request-id` and `user-agent`
+    requestHeaders: []
+
+  distributedTracing:
+    # Can disable the distributed tracing
+    enabled: true
+    # OTLP endpoint to send spans to
+    otlpEndpoint: "http://opentelemetry-collector.istio-system:4317"
