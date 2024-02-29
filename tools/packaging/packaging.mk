@@ -28,6 +28,7 @@ SIDECAR_FILES:=
 $(foreach DEP,$(SIDECAR_DEB_DEPS),\
         $(eval ${TARGET_OUT_LINUX}/release/istio-sidecar.deb: $(TARGET_OUT_LINUX)/$(DEP)) \
         $(eval ${TARGET_OUT_LINUX}/release/istio-sidecar.rpm: $(TARGET_OUT_LINUX)/$(DEP)) \
+        $(eval ${TARGET_OUT_LINUX}/release/istio-sidecar-rhel.rpm: $(TARGET_OUT_LINUX)/$(DEP)) \
         $(eval SIDECAR_FILES+=$(TARGET_OUT_LINUX)/$(DEP)=$(ISTIO_DEB_BIN)/$(DEP)) )
 
 ISTIO_DEB_DEST:=${ISTIO_DEB_BIN}/istio-start.sh \
@@ -51,16 +52,17 @@ SIDECAR_PACKAGE_NAME ?= istio-sidecar
 # --iteration 1 adds a "-1" suffix to the version that didn't exist before
 ${TARGET_OUT_LINUX}/release/istio-sidecar.deb: | ${TARGET_OUT_LINUX} deb/fpm
 ${TARGET_OUT_LINUX}/release/istio-sidecar.rpm: | ${TARGET_OUT_LINUX} rpm/fpm
+${TARGET_OUT_LINUX}/release/istio-sidecar-rhel.rpm: | ${TARGET_OUT_LINUX} rhel-rpm/fpm
 
 # Package the sidecar rpm file.
-rpm/fpm: ambient_rpm
+rpm/fpm: ambient_rpm rhel-rpm/fpm
 	rm -f ${TARGET_OUT_LINUX}/release/istio-sidecar.rpm
 	fpm -s dir -t rpm -n ${SIDECAR_PACKAGE_NAME} -p ${TARGET_OUT_LINUX}/release/istio-sidecar.rpm --version $(PACKAGE_VERSION) -f \
-		--url http://istio.io  \
+		--url https://solo.io  \
 		--license Apache \
 		--architecture "${TARGET_ARCH}" \
-		--vendor istio.io \
-		--maintainer istio@istio.io \
+		--vendor solo.io \
+		--maintainer support@solo.io \
 		--after-install tools/packaging/postinst.sh \
 		--config-files /var/lib/istio/envoy/envoy_bootstrap_tmpl.json \
 		--config-files /var/lib/istio/envoy/sidecar.env \
@@ -72,15 +74,48 @@ rpm/fpm: ambient_rpm
 		$(RPM_COMPRESSION) \
 		$(SIDECAR_FILES)
 
+# We need to define the digest algorithm for RHEL+FIPS, the rpm command reports SHA256 digest OK outside of FIPS
+# and the default seems to be MD5, which is an algorithm not allowed in FIPS mode. I also don't want to change the
+# main rpm packaging because I don't know what may break if that is changed to use the SHA256 digest. Things indicate
+# that it might not be an issue, but that's a risk.
+rhel-rpm/fpm:
+	rm -f ${TARGET_OUT_LINUX}/release/istio-sidecar-rhel.rpm
+	fpm -s dir -t rpm -n ${SIDECAR_PACKAGE_NAME} -p ${TARGET_OUT_LINUX}/release/istio-sidecar-rhel.rpm --version $(PACKAGE_VERSION) \
+		--rpm-digest sha256 \
+		-f \
+		--url https://solo.io  \
+		--license Apache \
+		--architecture "${TARGET_ARCH}" \
+		--vendor solo.io \
+		--maintainer support@solo.io \
+		--after-install tools/packaging/postinst.sh \
+		--config-files /var/lib/istio/envoy/envoy_bootstrap_tmpl.json \
+		--config-files /var/lib/istio/envoy/sidecar.env \
+		--description "Istio Sidecar" \
+		--depends iproute \
+		--depends iptables \
+		--depends sudo \
+		--depends hostname \
+		$(RPM_COMPRESSION) \
+		$(SIDECAR_FILES)
+ifeq ($(CI),true)
+	mkdir -p ${GOPATH}/../out/rpm
+ifeq ($(TARGET_ARCH),amd64)
+	cp ${TARGET_OUT_LINUX}/release/istio-sidecar-rhel.rpm ${GOPATH}/../out/rpm
+else
+	cp ${TARGET_OUT_LINUX}/release/istio-sidecar-rhel.rpm ${GOPATH}/../out/rpm/istio-sidecar-rhel-$(TARGET_ARCH).rpm
+endif
+endif
+
 # Package the sidecar deb file.
 deb/fpm: ambient_deb
 	rm -f ${TARGET_OUT_LINUX}/release/istio-sidecar.deb
 	fpm -s dir -t deb -n ${SIDECAR_PACKAGE_NAME} -p ${TARGET_OUT_LINUX}/release/istio-sidecar.deb --version $(PACKAGE_VERSION) -f \
-		--url http://istio.io  \
+		--url https://solo.io  \
 		--license Apache \
-		--vendor istio.io \
+		--vendor solo.io \
 		--architecture "${TARGET_ARCH}" \
-		--maintainer istio@istio.io \
+		--maintainer support@solo.io \
 		--after-install tools/packaging/postinst.sh \
 		--config-files /var/lib/istio/envoy/envoy_bootstrap_tmpl.json \
 		--config-files /var/lib/istio/envoy/sidecar.env \
@@ -96,4 +131,5 @@ deb/fpm: ambient_deb
 	deb \
 	deb/fpm \
 	rpm/fpm \
+	rhel-rpm/fpm \
 	sidecar.deb
