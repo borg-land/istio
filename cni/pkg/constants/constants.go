@@ -62,10 +62,12 @@ const (
 	UDSLogPath            = "/log"
 
 	// K8s liveness and readiness endpoints
-	LivenessEndpoint   = "/healthz"
-	ReadinessEndpoint  = "/readyz"
-	ReadinessPort      = "8000"
-	ServiceAccountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
+	LivenessEndpoint        = "/healthz"
+	ReadinessEndpoint       = "/readyz"
+	ReadinessPort           = "8000"
+	ServiceAccountPath      = "/var/run/secrets/kubernetes.io/serviceaccount"
+	IstioCniComponentLabel  = "operator.istio.io/component=cni"
+	IstioCniAgentVersionEnv = "AGENT_UPGRADE_ID"
 )
 
 // Exposed for testing "constants"

@@ -65,6 +65,6 @@ metadata:
 rules:
 - apiGroups: [""]
   {{- /* pods/status is less privileged than the full pod, and either can label. So use the lower pods/status */}}
-  resources: ["pods/status"]
-  verbs: ["patch", "update"]
+  resources: ["pods/status", "configmaps"]
+  verbs: ["patch", "update", "get", "list"]
 {{- end }}

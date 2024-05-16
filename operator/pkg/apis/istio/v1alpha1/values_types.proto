@@ -133,6 +133,16 @@ message CNIConfig {
   // May be specified as a number of pods or as a percent of the total number
   // of pods at the start of the update.
   IntOrString rollingMaxUnavailable = 23;
+
+  // SOLO - AGENT_UPGRADE_ID is set to a random 16-char slug on each helm install/upgrade of this chart.
+  // This value is rechecked on `istio-cni` agent shutdown - if the random slug in the configmap
+  // does not match the value populated in the `istio-cni` containers env when it started up, then
+  // we know the configmap has been updated or replaced, and this is treated as an
+  // indication that an upgrade is happening, causing `istio-cni` to leave certain node-level configs in place.
+
+  // This overrides that with a fixed value, in case things like ILM want to self-manage aspects of this.
+  // DO NOT USE OR SET: This is not necessary to be (and should not be) set by *anyone* except (maybe) Solo's ILM, as a temporary/break-glass measure. Just use the chart like normal and don't bother with this.
+  string soloAgentManualUpgradeId = 26;
 }
 
 message CNIUsageConfig {

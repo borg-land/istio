@@ -17,6 +17,10 @@ metadata:
     istio.io/rev: {{ .Values.revision | default "default" }}
     install.operator.istio.io/owning-resource: {{ .Values.ownerName | default "unknown" }}
     operator.istio.io/component: "Cni"
+  annotations:
+    # SOLO - we add this, so that if the configmap for this chart changes, we always restart the daemonset pods
+    # This is because we have upgrade functionality that keys off the CM (see AGENT_UPGRADE_ID)
+    solo.io/config-checksum: {{ include (print $.Template.BasePath "/configmap-cni.yaml") . | sha256sum }}
 spec:
   selector:
     matchLabels:
@@ -140,9 +144,7 @@ spec:
                 resourceFieldRef:
                   resource: limits.cpu
             - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
+              value: {{ template "name" . }}
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:

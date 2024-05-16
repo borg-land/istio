@@ -8,9 +8,17 @@ metadata:
     release: {{ .Release.Name }}
     istio.io/rev: {{ .Values.revision | default "default" }}
     install.operator.istio.io/owning-resource: {{ .Values.ownerName | default "unknown" }}
-    operator.istio.io/component: "Cni"
+    operator.istio.io/component: "cni"
 data:
   CURRENT_AGENT_VERSION: {{ .Values.cni.tag | default .Values.global.tag | quote }}
+  # SOLO - AGENT_UPGRADE_ID is set to a random 16-char slug on each helm install/upgrade of this chart.
+  # This value is rechecked on `istio-cni` agent shutdown - if the random slug in the configmap
+  # does not match the value populated in the `istio-cni` containers env when it started up, then
+  # we know the configmap has been updated or replaced, and this is treated as an
+  # indication that an upgrade is happening, causing `istio-cni` to leave certain node-level configs in place.
+  # You can manually edit the CM, but if you edit this particular value manually, you will likely break your nodes
+  AGENT_UPGRADE_ID: {{ .Values.cni.soloAgentManualUpgradeId | default (randAlphaNum 16) | quote }}
+  LOG_LEVEL: {{ .Values.cni.logLevel | quote }}
   AMBIENT_ENABLED: {{ .Values.cni.ambient.enabled | quote }}
   AMBIENT_DNS_CAPTURE: {{ .Values.cni.ambient.dnsCapture | default "false" | quote  }}
   AMBIENT_IPV6: {{ .Values.cni.ambient.ipv6 | default "false" | quote }}
