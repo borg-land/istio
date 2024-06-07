@@ -321,6 +321,16 @@ func (configgen *ConfigGeneratorImpl) buildOutboundClusters(cb *ClusterBuilder, 
 
 			// create default cluster
 			discoveryType := convertResolution(cb.proxyType, service)
+
+			// SOLO
+			// This is tricky; we convert to EDS when we have a service waypoint. This needs to be kept in sync with endpoint_builder
+			// which will replace the endpoints with the waypoint's.
+			if features.EnableWaypointInterop &&
+				(discoveryType == cluster.Cluster_STRICT_DNS || discoveryType == cluster.Cluster_LOGICAL_DNS) && clusterKey.hasWaypointServices {
+				discoveryType = cluster.Cluster_EDS
+			}
+			// END SOLO
+
 			defaultCluster := cb.buildCluster(clusterKey.clusterName, discoveryType, lbEndpoints, model.TrafficDirectionOutbound, port, service, nil, "")
 			if defaultCluster == nil {
 				continue

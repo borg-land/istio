@@ -852,6 +852,7 @@ type ServiceDiscovery interface {
 }
 
 type AmbientIndexes interface {
+	ServicesWithWaypoint(key string) []ServiceWaypointInfo
 	AddressInformation(addresses sets.String) ([]AddressInfo, sets.String)
 	AdditionalPodSubscriptions(
 		proxy *Proxy,
