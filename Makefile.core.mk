@@ -281,7 +281,8 @@ lint-helm-global:
 
 lint: lint-python lint-copyright-banner lint-scripts lint-go lint-dockerfiles lint-markdown lint-yaml lint-licenses lint-helm-global check-agent-deps ## Runs all linters.
 	@bin/check_samples.sh
-	@testlinter
+# SOLO: Disable test linter as we can only skip with upstream issues.
+# @testlinter
 	@envvarlinter istioctl pilot security
 
 # Allow-list:
