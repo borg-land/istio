@@ -93,6 +93,7 @@ defaults:
   # TODO Ambient inpod - for OpenShift, set to the following to get writable sockets in hostmounts to work, eventually consider CSI driver instead
   #seLinuxOptions:
   #  type: spc_t
+  #
 
 # Configuration for Solo's L7 telemetry support in Ztunnel
 l7Telemetry:
@@ -121,3 +122,6 @@ l7Telemetry:
     enabled: true
     # OTLP endpoint to send spans to
     otlpEndpoint: "http://opentelemetry-collector.istio-system:4317"
+
+spire:
+  enabled: false

@@ -192,6 +192,9 @@ if [ "${VM_PROXY}" = "ztunnel" ]; then
   sed -i '/ISTIO_META_ENABLE_HBONE: "true"/a \ \ \ \ DNS_PROXY_ADDR: "127.0.0.1:15053"' "$WORK_DIR"/mesh.yaml
   # Set the WORKLOAD_IDENTITY_SOCKET_PATH to use SPIRE
   echo "WORKLOAD_IDENTITY_SOCKET_PATH='unix:///var/run/spire/api.sock'" >> "$WORK_DIR/cluster.env"
+  # Enable SPIRE support in ztunnel generally (both VM (ztunnel ProxyMode == Dedicated)
+  # and ambient SPIRE (ztunnel ProxyMode == Shared) integration need this enabled)
+  echo "SPIRE_ENABLED=true" >> "$WORK_DIR/cluster.env"
 else
   kubectl label namespace test istio.io/dataplane-mode- --overwrite=true
   kubectl label namespace test istio-injection=enabled --overwrite=true

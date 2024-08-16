@@ -52,6 +52,9 @@ spec:
           operator: Exists
         - effect: NoExecute
           operator: Exists
+{{- if .Values.spire.enabled }}
+      hostPID: true
+{{- end }}
       containers:
       - name: istio-proxy
 {{- if contains "/" .Values.image }}
@@ -71,8 +74,12 @@ spec:
         imagePullPolicy: {{ . }}
 {{- end }}
         securityContext:
-          allowPrivilegeEscalation: false
+          allowPrivilegeEscalation: true
+{{- if .Values.spire.enabled }} # Needed for spire procfs-scan
+          privileged: true
+{{- else }}
           privileged: false
+{{- end }}
           capabilities:
             drop:
             - ALL
@@ -97,8 +104,12 @@ spec:
         - ztunnel
         env:
         - name: CA_ADDRESS
-        {{- if .Values.caAddress }}
+        {{- if and (.Values.caAddress) (not .Values.spire.enabled) }}
           value: {{ .Values.caAddress }}
+        # For SPIRE, this is fixed to a local sockmount
+        # of the SPIRE agent admin API
+        {{- else if .Values.spire.enabled }}
+          value: "unix:///var/run/spire/admin.sock"
         {{- else }}
           value: istiod{{- if not (eq .Values.revision "") }}-{{ .Values.revision }}{{- end }}.{{ .Values.istioNamespace }}.svc:15012
         {{- end }}
@@ -116,6 +127,10 @@ spec:
           value: {{ .Values.multiCluster.clusterName | default "Kubernetes" }}
         - name: INPOD_ENABLED
           value: "true"
+        {{- if .Values.spire.enabled }}
+        - name: SPIRE_ENABLED
+          value: "true"
+        {{- end }}
         - name: TERMINATION_GRACE_PERIOD_SECONDS
           value: "{{ .Values.terminationGracePeriodSeconds }}"
         - name: ISTIO_META_DNS_PROXY_ADDR
@@ -168,6 +183,13 @@ spec:
           name: tmp
         - mountPath: /etc/ztunnel/config
           name: istio-ztunnel-l7-config
+        {{- if .Values.spire.enabled }}
+        - mountPath: /host/proc
+          name: zt-host-procfs
+          readOnly: true
+        - mountPath: /var/run/spire
+          name: spire-admin-sock-dir
+        {{- end }}
         {{- with .Values.volumeMounts }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -187,13 +209,23 @@ spec:
       - name: cni-ztunnel-sock-dir
         hostPath:
           path: /var/run/ztunnel
-          type: DirectoryOrCreate # ideally this would be a socket, but ztunnel may not have started yet.
+          type: DirectoryOrCreate # ideally this would be a socket, but cni may not have started yet.
       # pprof needs a writable /tmp, and we don't have that thanks to `readOnlyRootFilesystem: true`, so mount one
       - name: tmp
         emptyDir: {}
       - name: istio-ztunnel-l7-config
         configMap:
           name: istio-ztunnel
+      {{- if .Values.spire.enabled }}
+      - name: zt-host-procfs
+        hostPath:
+          path: /proc
+          type: Directory
+      - name: spire-admin-sock-dir
+        hostPath:
+          path: /var/run/spire/agent/sockets/csi.spiffe.io/admin
+          type: DirectoryOrCreate # ideally this would be a socket, but spire-agent may not have started yet.
+      {{- end }}
       {{- with .Values.volumes }}
         {{- toYaml . | nindent 6}}
       {{- end }}

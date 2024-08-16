@@ -1,7 +1,10 @@
 {
   "gateways": {
     "seccompProfile": {},
-    "securityContext": {}
+    "securityContext": {},
+    "spire": {
+      "workloads": false
+    }
   },
   "global": {
     "autoscalingv2API": true,

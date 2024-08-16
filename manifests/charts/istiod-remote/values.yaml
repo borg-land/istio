@@ -442,3 +442,5 @@ defaults:
     securityContext: {}
     # Set to `type: RuntimeDefault` to use the default profile for templated gateways, if your container runtime supports it
     seccompProfile: {}
+    spire:
+      workloads: false
